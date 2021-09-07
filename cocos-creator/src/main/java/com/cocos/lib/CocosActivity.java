@@ -25,13 +25,18 @@
 package com.cocos.lib;
 
 import android.app.Activity;
+import android.content.ComponentName;
+import android.content.Context;
+import android.content.Intent;
+import android.content.ServiceConnection;
 import android.content.pm.ApplicationInfo;
 import android.content.pm.PackageManager;
 import android.content.res.AssetManager;
 import android.media.AudioManager;
 import android.os.Build;
 import android.os.Bundle;
-import android.view.KeyEvent;
+import android.os.IBinder;
+import android.os.RemoteException;
 import android.view.Surface;
 import android.view.SurfaceHolder;
 import android.view.View;
@@ -39,10 +44,15 @@ import android.view.ViewGroup;
 import android.view.WindowManager;
 import android.widget.FrameLayout;
 
+import com.cocos.bridge.Cocos2MainService;
+import com.cocos.bridge.CocosBridgeHelper;
+
 import java.io.File;
 import java.lang.reflect.Field;
 
-public class CocosActivity extends Activity implements SurfaceHolder.Callback {
+public class CocosActivity extends Activity implements SurfaceHolder.Callback, ServiceConnection {
+    public static IAIDLCocos2Main mIAIDLCocos2Main;
+
     private boolean mDestroyed;
     private SurfaceHolder mSurfaceHolder;
     private FrameLayout mFrameLayout;
@@ -98,6 +108,9 @@ public class CocosActivity extends Activity implements SurfaceHolder.Callback {
         Utils.hideVirtualButton();
 
         mOrientationHelper = new CocosOrientationHelper(this);
+
+        Intent intent = new Intent(this, Cocos2MainService.class);
+        bindService(intent, this, Context.BIND_AUTO_CREATE);
     }
 
     protected String filePath() {
@@ -167,6 +180,7 @@ public class CocosActivity extends Activity implements SurfaceHolder.Callback {
             mSurfaceHolder = null;
         }
         super.onDestroy();
+        unbindService(this);
     }
 
     @Override
@@ -256,5 +270,45 @@ public class CocosActivity extends Activity implements SurfaceHolder.Callback {
     public void onBackPressed() {
         super.onBackPressed();
         System.exit(0);
+    }
+
+    private IBinder.DeathRecipient mDeathRecipient = new IBinder.DeathRecipient() {
+
+        @Override
+        public void binderDied() {
+            if (mIAIDLCocos2Main == null) return;
+
+            mIAIDLCocos2Main.asBinder().unlinkToDeath(mDeathRecipient, 0);
+            mIAIDLCocos2Main = null;
+            // 重新绑定远程服务
+            Intent intent = new Intent(CocosActivity.this, Cocos2MainService.class);
+            bindService(intent, CocosActivity.this, Context.BIND_AUTO_CREATE);
+        }
+    };
+
+    private IAIDLCallBack iAidlCallBack = new IAIDLCallBack.Stub() {
+
+        @Override
+        public void main2Cocos(String action, String argument, String callbackId) {
+            CocosBridgeHelper.log("Cocos进程收到主进程消息", "action: " + action + ", argument: " + argument + ", callbackId: " + callbackId);
+            CocosBridgeHelper.getInstance().nativeCallCocos(action, argument, callbackId);
+        }
+    };
+
+    @Override
+    public void onServiceConnected(ComponentName name, IBinder service) {
+        mIAIDLCocos2Main = IAIDLCocos2Main.Stub.asInterface(service);
+        try {
+            // 注册死亡代理
+            service.linkToDeath(mDeathRecipient, 0);
+            mIAIDLCocos2Main.setAIDLCallBack(iAidlCallBack);
+        } catch (RemoteException e) {
+            e.printStackTrace();
+        }
+    }
+
+    @Override
+    public void onServiceDisconnected(ComponentName name) {
+        mIAIDLCocos2Main = null;
     }
 }

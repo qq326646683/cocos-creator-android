@@ -5,28 +5,35 @@ import android.Manifest.permission.WRITE_EXTERNAL_STORAGE
 import android.app.DownloadManager
 import android.content.Intent
 import android.os.Build
-import androidx.appcompat.app.AppCompatActivity
 import android.os.Bundle
 import android.os.Environment
-import android.util.Log
 import android.widget.Button
 import androidx.annotation.RequiresApi
+import androidx.appcompat.app.AppCompatActivity
 import androidx.appcompat.widget.AppCompatButton
+import com.cocos.bridge.CocosBridgeHelper
+import com.cocos.bridge.CocosDataListener
 import com.cocos.lib.GlobalObject
 
 class MainActivity : AppCompatActivity() {
-    val download1Url = "http://file.jinxianyun.com/default.zip"
+    val download1Url = "http://file.jinxianyun.com/default8.zip"
     val download2Url = "http://file.jinxianyun.com/hellococos.zip"
 
     var btnDownload1: Button? = null
     var btnDownload2: Button? = null
 
-    val listener: DownloadListener = object : DownloadListener {
+    private val downloadListener: DownloadListener = object : DownloadListener {
         override fun callBack(taskId: Int, status: Int, progress: Int) {
             updateUI(download1Url, btnDownload1, taskId, status, progress)
             updateUI(download2Url, btnDownload2, taskId, status, progress)
         }
+    }
 
+    private val cocosListenerInMain: CocosDataListener = CocosDataListener { action, argument, callbackId ->
+        CocosBridgeHelper.log("接收InMain", action)
+        if (action == "action_appVersion") {
+            CocosBridgeHelper.getInstance().main2Cocos(action, packageManager.getPackageInfo(packageName, 0).versionName, callbackId)
+        }
     }
 
     @RequiresApi(Build.VERSION_CODES.M)
@@ -34,10 +41,10 @@ class MainActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
         GlobalObject.setActivity(this)
-
         requestPermissions(arrayOf(READ_EXTERNAL_STORAGE, WRITE_EXTERNAL_STORAGE), 20)
 
-        DownloadUtil.instance.addListener(listener)
+        DownloadUtil.instance.addListener(downloadListener)
+        CocosBridgeHelper.getInstance().addMainListener(cocosListenerInMain)
 
         btnDownload1 = findViewById<AppCompatButton>(R.id.btn_download1).apply {
             setOnClickListener {
@@ -49,6 +56,8 @@ class MainActivity : AppCompatActivity() {
                 DownloadUtil.instance.download(download2Url)
             }
         }
+
+        CocosBridgeHelper.log("主进程", "---")
 
     }
 
@@ -104,6 +113,8 @@ class MainActivity : AppCompatActivity() {
 
     override fun onDestroy() {
         super.onDestroy()
-        DownloadUtil.instance.removeListener(listener)
+        DownloadUtil.instance.removeListener(downloadListener)
+        CocosBridgeHelper.getInstance().removeMainListener(cocosListenerInMain)
+
     }
 }

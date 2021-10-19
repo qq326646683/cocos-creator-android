@@ -8,7 +8,7 @@ allprojects {
 ```
 ```
 dependencies {
-       implementation 'com.github.qq326646683:cocos-creator-android:2.0.0'
+       implementation 'com.github.qq326646683:cocos-creator-android:2.0.1'
 }
 ```
 
@@ -93,4 +93,5 @@ override fun onDestroy() {
 
 ### 三、实现原理：
 [Android实战——Cocos游戏容器搭建篇](https://github.com/qq326646683/tech-article/blob/master/android/Android实战——Cocos游戏容器搭建篇.md)
+
 [Android实战——Cocos游戏容器通信篇](https://github.com/qq326646683/tech-article/blob/master/android/Android实战——Cocos游戏容器通信篇.md)
